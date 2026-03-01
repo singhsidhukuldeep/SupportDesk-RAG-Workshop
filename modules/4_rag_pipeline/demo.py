@@ -343,29 +343,35 @@ def rag_with_validation(query, retriever, llm, min_similarity_score=0.5):
         RAG pipeline with additional validation and fallback.
 
         Validation rule in this demo:
-        - Use vector distance as a confidence proxy.
-        - If the nearest document is too far away (distance > threshold),
+        - Use relevance score as a confidence proxy.
+        - If the best document's relevance score is too low (< threshold),
             return a safe fallback instead of forcing an answer.
 
         Note:
-        - Chroma cosine distance is lower for better matches.
+        - similarity_search_with_relevance_scores() returns scores in [0, 1].
+        - Higher = more similar (derived from cosine similarity).
+        - This keeps things consistent with the cosine similarity concept
+          taught in earlier modules (cosine similarity: -1 to 1).
         - This is a simple, practical guardrail for anti-hallucination behavior.
     """
-    # Retrieve documents with scores
-    docs_with_scores = vector_store.similarity_search_with_score(query, k=3)
+    # Retrieve documents with relevance scores (0 = least relevant, 1 = most relevant)
+    # Uses similarity_search_with_relevance_scores instead of similarity_search_with_score
+    # because the latter returns raw cosine *distance* (0–2, lower=better), which is
+    # confusing when we've been teaching cosine *similarity* (-1 to 1, higher=better).
+    docs_with_scores = vector_store.similarity_search_with_relevance_scores(query, k=3)
 
     print(f"\nQuery: {query}")
-    print(f"\nRetrieval scores (cosine distance: 0=identical, 1=orthogonal, 2=opposite):")
+    print(f"\nRelevance scores (cosine similarity: 0=no match, 1=identical):")
     for doc, score in docs_with_scores:
         print(f"  - {doc.metadata['ticket_id']}: {score:.4f}")
 
-    # Use the closest retrieved document as the confidence anchor.
+    # Use the best retrieved document as the confidence anchor.
     # If even the best match is weak, the whole answer should be treated as risky.
     best_score = docs_with_scores[0][1]
 
-    # Cosine distance: lower = more similar. 0.5 means cosine_similarity < 0.5 — too weak to answer.
-    if best_score > min_similarity_score:
-        print(f"\n⚠ Best match distance ({best_score:.4f}) exceeds threshold ({min_similarity_score}) — too dissimilar to answer confidently")
+    # Relevance score: higher = more similar. Below 0.5 means the match is too weak to answer.
+    if best_score < min_similarity_score:
+        print(f"\n⚠ Best match relevance ({best_score:.4f}) is below threshold ({min_similarity_score}) — too dissimilar to answer confidently")
         return "I don't have enough relevant information in the ticket history to answer that question confidently."
     
     # If we pass the confidence gate, build context and ask the model normally.
