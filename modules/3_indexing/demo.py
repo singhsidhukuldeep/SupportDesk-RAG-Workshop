@@ -325,20 +325,42 @@ for i, node in enumerate(summary_response.source_nodes[:3], 1):
 # PART 3: Tree Index (Hierarchical Retrieval)
 # ============================================================================
 #
-# BEST FOR LARGE DOCUMENT COLLECTIONS
+# BEST FOR LARGE DOCUMENT COLLECTIONS WITH NATURAL HIERARCHY
 #
-# HOW IT WORKS:
-# ─────────────
-#   Build time (EXPENSIVE - many LLM calls!):
-#     1. Each document becomes a LEAF node
-#     2. LLM groups related docs and creates SUMMARY nodes
-#     3. Repeat until one ROOT node summarizes everything
+# HOW THE TREE IS BUILT (Bottom-Up, EXPENSIVE):
+# ──────────────────────────────────────────────
+#   1. Each document/chunk becomes a LEAF node
+#   2. Leaves are grouped SEQUENTIALLY (by insertion order!) into
+#      groups of `num_children` — NOT by topic similarity!
+#   3. LLM summarizes each group → creates parent SUMMARY nodes
+#   4. Repeat on summaries until a single ROOT node remains
 #
-#   Query time (EFFICIENT - log(n) traversal):
-#     1. Start at root
-#     2. LLM scores children: "Which branch is most relevant?"
-#     3. Traverse down the best branch(es)
-#     4. Reach leaf nodes → return those documents
+#   IMPORTANT MISCONCEPTION:
+#     Grouping is NOT semantic — it's purely positional.
+#     Chunks [0,1,2,3] become Group 1, [4,5,6,7] become Group 2, etc.
+#     This works because documents have natural locality of topic:
+#     nearby chunks tend to cover related subjects.
+#
+#   BUILD COST (each group = 1 LLM call):
+#     num_children=2,  1000 leaves → ~999 LLM calls, tree height ~10
+#     num_children=4,  1000 leaves → ~333 LLM calls, tree height ~5
+#     num_children=10, 1000 leaves → ~111 LLM calls, tree height ~3
+#
+#   Higher num_children = fewer LLM calls but coarser summaries
+#   Lower  num_children = more LLM calls but finer-grained summaries
+#
+# HOW QUERIES WORK (EFFICIENT - log(n) traversal):
+# ─────────────────────────────────────────────────
+#   1. Start at root
+#   2. LLM scores all children: "Which branch is most relevant?"
+#   3. Follow top `child_branch_factor` branches
+#   4. Repeat until reaching leaf nodes
+#   5. Collect leaves, synthesize final answer
+#
+#   child_branch_factor controls recall vs speed:
+#     =1  → Greedy single path (fast, may miss relevant branches)
+#     =2  → Balanced, explores 2 paths (recommended for multi-topic)
+#     =N  → Exhaustive, approaches Summary Index behavior
 #
 # VISUAL - Tree Structure:
 #   ┌────────────────────────────────────────────────────────┐
@@ -348,27 +370,35 @@ for i, node in enumerate(summary_response.source_nodes[:3], 1):
 #   │        ┌─────────────────┼─────────────────┐           │
 #   │        ▼                 ▼                 ▼           │
 #   │   [Auth Issues]    [Performance]      [Billing]        │
+#   │     (summary)        (summary)         (summary)       │
 #   │        │                 │                 │           │
 #   │   ┌────┼────┐    ┌───────┼───────┐     ┌──┴──┐        │
 #   │   ▼         ▼    ▼       ▼       ▼     ▼     ▼        │
-#   │ [T-1]    [T-5] [T-7]   [T-9]  [T-12] [T-20] [T-25]    │
+#   │ [T-1]    [T-5] [T-7]   [T-9]  [T-12] [T-20] [T-25]   │
+#   │ (leaf)  (leaf) (leaf)  (leaf)  (leaf) (leaf) (leaf)    │
 #   │                                                        │
 #   │ Query: "auth issues after password reset"              │
-#   │        └─→ Root → Auth Issues → T-1, T-5 (leaves)     │
+#   │   child_branch_factor=1:                               │
+#   │     Root → Auth Issues (best) → T-1 (best leaf)       │
+#   │   child_branch_factor=2:                               │
+#   │     Root → Auth + Perf → T-1, T-5, T-7, T-9           │
 #   └────────────────────────────────────────────────────────┘
 #
 # WHY IT'S EFFICIENT:
 #   Instead of searching 50 docs (O(n)), we traverse ~3 levels (O(log n))
-#   For 1000 docs: Vector = 1000 comparisons, Tree = ~10 LLM decisions
+#   For 1000 docs with num_children=10: only ~3 levels of LLM decisions
 #
 # TRADE-OFF:
 #   Build time: SLOW (many LLM calls to create summaries)
 #   Query time: FAST (logarithmic traversal)
+#   num_children: Lower = deeper tree, finer summaries, more build cost
+#                 Higher = shallower tree, coarser summaries, less build cost
 #
 # WHEN TO USE:
 #   - Very large document collections (1000s of docs)
-#   - Hierarchically structured content (books, documentation)
+#   - Hierarchically structured content (books, manuals, wikis)
 #   - When build time is acceptable (offline indexing)
+#   - Multi-level queries (broad → narrow)
 #
 # ============================================================================
 print("\n" + "="*80)
@@ -392,21 +422,36 @@ print(f"Building Tree Index with {len(tree_documents)} documents...")
 # -----------------------------------------------------------------------------
 # Build the Tree Index
 # -----------------------------------------------------------------------------
-# LlamaIndex will:
-#   1. Create leaf nodes from each document
-#   2. Call LLM to generate summaries for groups of related docs
-#   3. Repeat until a single root summary exists
-# This is EXPENSIVE - each grouping requires an LLM call!
+# LlamaIndex builds the tree BOTTOM-UP:
+#   1. Each document becomes a leaf node
+#   2. Leaves are grouped SEQUENTIALLY in chunks of `num_children`
+#      (NOT by topic — just by insertion order!)
+#   3. LLM summarizes each group → creates parent summary nodes
+#   4. Repeat on summaries until a single root node remains
+#
+# Default num_children=10 → groups of 10 docs per summary
+# For 50 docs: ~5 summaries at level 1, then 1 root = ~6 LLM calls
+#
+# Why sequential grouping still works:
+#   Documents loaded in order preserve locality of topic.
+#   The LLM summary layer compensates for any mixed groups.
 # -----------------------------------------------------------------------------
 tree_index = TreeIndex.from_documents(tree_documents)
 
 # -----------------------------------------------------------------------------
 # Create Query Engine
 # -----------------------------------------------------------------------------
-# child_branch_factor=2:
-#   At each level, explore the top 2 most relevant branches
-#   Higher = broader search (more paths explored)
-#   Lower = focused search (may miss relevant docs in other branches)
+# child_branch_factor controls how many branches the LLM follows at each level:
+#
+#   =1 (greedy):  Fast but may miss info in other branches
+#                  Good for focused single-topic queries
+#   =2 (balanced): Explores top 2 branches per level — catches multi-topic
+#                  queries like "auth AND billing issues" (recommended)
+#   =N (all):     Explores everything — maximum recall but slow,
+#                  approaches Summary Index behavior
+#
+# At each level, the LLM scores ALL children for relevance to the query,
+# then follows only the top `child_branch_factor` branches downward.
 # -----------------------------------------------------------------------------
 tree_query_engine = tree_index.as_query_engine(child_branch_factor=2)
 
@@ -414,11 +459,16 @@ print("✓ Created tree index with hierarchical structure")
 print(f"\nQuery: '{query}'")
 
 # Query execution (hierarchical traversal):
-# 1. Start at root summary
-# 2. LLM scores each child branch for relevance to query
-# 3. Traverse into top-k branches (child_branch_factor)
-# 4. Repeat until reaching leaf nodes
-# 5. Collect relevant leaves, synthesize final answer
+# 1. Start at root summary node
+# 2. LLM scores each child: "Is this branch relevant to the query?"
+# 3. Select top `child_branch_factor` branches (here: top 2)
+# 4. Expand those branches → evaluate their children
+# 5. Repeat until reaching leaf nodes (actual document content)
+# 6. Collect all relevant leaves from explored paths
+# 7. Synthesize final answer from collected leaves
+#
+# If query spans multiple branches (e.g., "auth AND performance"),
+# child_branch_factor=2 lets us explore both Auth and Performance branches.
 tree_response = tree_query_engine.query(query)
 
 print("\nTree Index Results:")

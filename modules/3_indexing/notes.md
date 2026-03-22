@@ -417,9 +417,10 @@ Scale: <50 documents (gets slow beyond that)
 
 ### 3. Tree Index (Hierarchical)
 
-**Description**: Build a tree structure from leaf nodes (chunks) to root (summary).
+**Description:** Build a tree structure from leaf nodes (chunks) to root (summary).
 
 **How It Works:**
+
 ```
 Root: "Support system overview"
   ├─ Branch: "Authentication issues"
@@ -436,11 +437,191 @@ Query Process:
 4. Return bottom-up synthesized answer
 ```
 
-### Tree Index: Detailed Example with Physics Textbook
+#### How the Tree Is Built (Bottom-Up from Leaf Nodes)
+
+The tree is constructed **bottom-up**. LlamaIndex groups leaf nodes (chunks) into groups of `num_children`, asks the LLM to summarize each group, then repeats the process on the summaries until a single root node remains.
+
+**Example: 8 Leaf Nodes with `num_children=2`**
+
+```
+Input chunks: [L1] [L2] [L3] [L4] [L5] [L6] [L7] [L8]
+
+Step 1: Group leaves into pairs (num_children=2)
+         LLM summarizes each pair
+
+  [L1] [L2]  →  [S1: summary of L1+L2]
+  [L3] [L4]  →  [S2: summary of L3+L4]
+  [L5] [L6]  →  [S3: summary of L5+L6]
+  [L7] [L8]  →  [S4: summary of L7+L8]
+
+Step 2: Group summaries into pairs (num_children=2)
+         LLM summarizes each pair
+
+  [S1] [S2]  →  [S5: summary of S1+S2]
+  [S3] [S4]  →  [S6: summary of S3+S4]
+
+Step 3: Group into final root (num_children=2)
+         LLM summarizes the pair
+
+  [S5] [S6]  →  [ROOT: summary of S5+S6]
+
+Resulting tree (height = 3):
+
+                    [ROOT]
+                   /      \
+               [S5]        [S6]
+              /    \      /    \
+           [S1]  [S2]  [S3]  [S4]
+           / \   / \   / \   / \
+          L1 L2 L3 L4 L5 L6 L7 L8
+
+LLM calls to build: 4 + 2 + 1 = 7 summarization calls
+```
+
+**Same 8 Leaf Nodes with `num_children=4`**
+
+```
+Input chunks: [L1] [L2] [L3] [L4] [L5] [L6] [L7] [L8]
+
+Step 1: Group leaves into groups of 4 (num_children=4)
+         LLM summarizes each group
+
+  [L1] [L2] [L3] [L4]  →  [S1: summary of L1+L2+L3+L4]
+  [L5] [L6] [L7] [L8]  →  [S2: summary of L5+L6+L7+L8]
+
+Step 2: Group into final root (only 2 nodes, fits in one group)
+         LLM summarizes
+
+  [S1] [S2]  →  [ROOT: summary of S1+S2]
+
+Resulting tree (height = 2):
+
+                 [ROOT]
+                /      \
+            [S1]        [S2]
+          / | \ \     / | \ \
+        L1 L2 L3 L4 L5 L6 L7 L8
+
+LLM calls to build: 2 + 1 = 3 summarization calls
+```
+
+**Impact of `num_children` on Tree Shape:**
+
+```
+                    num_children=2          num_children=4
+                    ──────────────          ──────────────
+Tree height:        log₂(N)                 log₄(N)
+                    (tall & narrow)          (short & wide)
+
+Build cost:         More LLM calls          Fewer LLM calls
+                    (more summaries)         (fewer summaries)
+
+Summary quality:    Better (smaller groups)  Coarser (larger groups)
+                    Each summary focuses     Each summary covers
+                    on 2 children            4 children
+
+Query traversal:    More levels to traverse  Fewer levels
+                    More LLM decisions       Fewer LLM decisions
+                    per query                per query, but more
+                                             children to evaluate
+                                             at each level
+
+For 1000 leaves:
+  num_children=2  → height ≈ 10, ~999 build calls
+  num_children=4  → height ≈ 5,  ~333 build calls
+  num_children=10 → height ≈ 3,  ~111 build calls
+```
+
+#### How Does Grouping Actually Work?
+
+A common misconception is that LlamaIndex groups chunks by **topic similarity**. It doesn't. The grouping is purely **sequential** — chunks are grouped in the order they were inserted (which is typically the order they appear in the document).
+
+```
+Document: "Physics Textbook"
+
+After chunking you get these chunks in order:
+  Chunk 0: Newton's First Law (inertia)
+  Chunk 1: Newton's Second Law (F=ma)
+  Chunk 2: Newton's Third Law (action-reaction)
+  Chunk 3: Kinetic Energy
+  Chunk 4: Potential Energy
+  Chunk 5: Conservation of Energy
+  Chunk 6: Coulomb's Law
+  Chunk 7: Electric Field Strength
+
+With num_children=4, LlamaIndex groups them strictly by position:
+  Group 1: [Chunk 0, Chunk 1, Chunk 2, Chunk 3]  ← "Newton's Laws + Kinetic Energy"
+  Group 2: [Chunk 4, Chunk 5, Chunk 6, Chunk 7]  ← "Potential/Conservation + Electric Fields"
+
+Notice: Group 1 mixes Newton's Laws with Kinetic Energy
+        Group 2 mixes Energy topics with Electromagnetism
+        The grouping is NOT semantic — it's just positional
+```
+
+**Why does this still work?**
+
+Documents naturally have **locality of topic** — nearby chunks tend to be about related things. A textbook discusses Newton's Laws on consecutive pages, not scattered randomly. So sequential grouping is a reasonable heuristic that works well for most structured documents.
+
+**When it breaks down:**
+
+```
+Scenario: You index 3 separate documents concatenated together
+
+  Doc A - Chunk 0: "Authentication overview"
+  Doc A - Chunk 1: "Password reset steps"      ← end of Doc A
+  Doc B - Chunk 2: "Billing FAQ"               ← start of Doc B (unrelated!)
+  Doc B - Chunk 3: "Refund policy"
+
+With num_children=2:
+  Group 1: [Chunk 0, Chunk 1]  → Summary: "Authentication topics" ✅ coherent
+  Group 2: [Chunk 2, Chunk 3]  → Summary: "Billing topics"       ✅ coherent
+
+With num_children=4:
+  Group 1: [Chunk 0, Chunk 1, Chunk 2, Chunk 3]
+           → Summary: "Auth and billing topics" ⚠️ mixed, coarser summary
+```
+
+**The LLM summary layer compensates:** Even when unrelated chunks land in the same group, the LLM writes a summary that captures what's in the group. At query time, the summary still mentions both topics, so the right branch can still be found. It's less precise, but it doesn't break.
+
+**What the actual LlamaIndex code does (simplified):**
+
+```python
+def build_tree_bottom_up(nodes, num_children):
+    """
+    Groups nodes sequentially, summarizes each group,
+    repeats until one root node remains.
+    """
+    current_level = nodes  # leaf chunks in insertion order
+
+    while len(current_level) > 1:
+        next_level = []
+
+        # Walk through nodes sequentially, grab groups of num_children
+        for i in range(0, len(current_level), num_children):
+            group = current_level[i : i + num_children]
+
+            # Concatenate the text of all nodes in the group
+            combined_text = "\n\n".join([node.text for node in group])
+
+            # Ask LLM to summarize the combined text
+            summary = llm.summarize(combined_text)
+
+            # Create parent node pointing to these children
+            parent = Node(text=summary, children=group)
+            next_level.append(parent)
+
+        current_level = next_level  # move one level up
+
+    return current_level[0]  # root node
+```
+
+**Key takeaway:** The tree structure is determined entirely by **chunk order + `num_children`**, not by semantic clustering. This is what makes it fast to build — no pairwise similarity computation needed.
+
+#### Tree Index: Detailed Example with Physics Textbook
 
 Let's see how LlamaIndex builds and queries a tree structure using a Physics textbook:
 
-#### Input: Physics Textbook Chapters
+**Input: Physics Textbook Chapters**
 
 ```
 Chapter 1: Classical Mechanics
@@ -464,9 +645,10 @@ Chapter 2: Electromagnetism
 
 #### How LlamaIndex Stores Nodes
 
-LlamaIndex creates a **multi-level hierarchy** with two types of indexes:
+LlamaIndex creates a multi-level hierarchy with two types of indexes:
 
 **Level 1: Leaf Nodes (Detailed Index)**
+
 ```python
 # These are the actual document chunks - stored with full content
 Leaf_1a = Node(
@@ -490,6 +672,7 @@ Leaf_1b = Node(
 ```
 
 **Level 2: Branch Nodes (Summary Index - Coarse)**
+
 ```python
 # LlamaIndex generates summaries of child nodes
 Branch_1_1 = Node(
@@ -512,6 +695,7 @@ Branch_1_2 = Node(
 ```
 
 **Level 3: Chapter Nodes (Higher-Level Summary)**
+
 ```python
 Chapter_1 = Node(
     text="Summary: Classical Mechanics chapter covering Newton's Laws, 
@@ -531,6 +715,7 @@ Chapter_2 = Node(
 ```
 
 **Level 4: Root Node (Top-Level Summary)**
+
 ```python
 Root = Node(
     text="Summary: Complete physics textbook covering Classical Mechanics 
@@ -581,13 +766,13 @@ Detailed Index = Leaf nodes
 
 **Query Example:** "Explain Newton's Second Law and electromagnetic induction"
 
-This query matches **two different branches** of the tree.
+This query matches two different branches of the tree.
 
-##### Scenario 1: Matching Nodes on Same Path
+**Scenario 1: Matching Nodes on Same Path**
 
-```
 Query: "Explain Newton's First and Second Laws"
 
+```
 Matching nodes:
   • Branch_1_1 (Newton's Laws) - matches both
   • Leaf_1a (First Law) - matches
@@ -607,11 +792,11 @@ Step 4: Synthesize answer from both leaves
 Result: Comprehensive answer using BOTH leaf nodes
 ```
 
-##### Scenario 2: Matching Nodes on Different Paths
+**Scenario 2: Matching Nodes on Different Paths**
 
-```
 Query: "Explain Newton's Second Law and electromagnetic induction"
 
+```
 Matching nodes:
   • Branch_1_1 (Newton's Laws) - matches "Second Law"
     └─ Leaf_1b (F=ma)
@@ -688,11 +873,15 @@ def query_tree_index(query, root_node, child_branch_factor=1):
 #### Key Insights
 
 **1. Coarse-to-Fine Retrieval:**
-- **Coarse (Summary Index)**: High-level summaries at branch/root
-- **Fine (Detailed Index)**: Full content at leaf nodes
-- Query starts coarse, drills down to fine details
+
+```
+Coarse (Summary Index): High-level summaries at branch/root
+Fine (Detailed Index): Full content at leaf nodes
+Query starts coarse, drills down to fine details
+```
 
 **2. Same Path Logic:**
+
 ```python
 if all_matching_nodes_on_same_path:
     # Retrieve all matching leaves on that path
@@ -701,6 +890,7 @@ if all_matching_nodes_on_same_path:
 ```
 
 **3. Different Path Logic:**
+
 ```python
 if matching_nodes_on_different_paths:
     # Evaluate each path's relevance
@@ -711,11 +901,115 @@ if matching_nodes_on_different_paths:
 ```
 
 **4. Efficiency:**
-- Don't read all documents (unlike Summary Index)
-- Only traverse relevant branches
-- Good for 1000+ documents with clear hierarchy
+
+```
+Don't read all documents (unlike Summary Index)
+Only traverse relevant branches
+Good for 1000+ documents with clear hierarchy
+```
+
+#### Retrieval with `child_branch_factor` — Visual Walkthrough
+
+The `child_branch_factor` controls **how many children the LLM evaluates and follows at each level** during traversal. It directly affects recall vs. speed.
+
+**Setup: Tree with `num_children=3` (3 children per node)**
+
+```
+                         [ROOT]
+                       /   |   \
+                    /      |      \
+               [B1]      [B2]      [B3]
+             "Auth"    "Billing"  "Shipping"
+             / | \     / | \      / | \
+           L1 L2 L3  L4 L5 L6  L7 L8 L9
+```
+
+**Query:** "Why is my login failing and my invoice wrong?"
+(Spans Auth AND Billing branches)
+
+---
+
+**`child_branch_factor=1` (Greedy — single path)**
+
+```
+Step 1: ROOT has 3 children → LLM scores all 3:
+          B1 "Auth"     → relevance: 0.85  ← WINNER
+          B2 "Billing"  → relevance: 0.80
+          B3 "Shipping" → relevance: 0.10
+        Pick top 1 → follow B1 only
+
+Step 2: B1 has 3 leaves → LLM scores all 3:
+          L1 "Password reset error"  → 0.90  ← WINNER
+          L2 "SSO failure"           → 0.70
+          L3 "MFA issues"            → 0.40
+        Pick top 1 → return L1
+
+Result: Only answers the "login failing" part
+        ❌ Completely misses billing/invoice info
+
+LLM calls during retrieval: 2 (one per level)
+Leaves retrieved: 1
+```
+
+**`child_branch_factor=2` (Balanced — two paths)**
+
+```
+Step 1: ROOT has 3 children → LLM scores all 3:
+          B1 "Auth"     → relevance: 0.85  ← SELECTED
+          B2 "Billing"  → relevance: 0.80  ← SELECTED
+          B3 "Shipping" → relevance: 0.10
+        Pick top 2 → follow B1 AND B2
+
+Step 2a: B1 has 3 leaves → LLM scores all 3:
+          L1 "Password reset error"  → 0.90  ← SELECTED
+          L2 "SSO failure"           → 0.70  ← SELECTED
+          L3 "MFA issues"            → 0.40
+        Pick top 2 → return L1, L2
+
+Step 2b: B2 has 3 leaves → LLM scores all 3:
+          L4 "Invoice mismatch"      → 0.88  ← SELECTED
+          L5 "Payment gateway error" → 0.60  ← SELECTED
+          L6 "Subscription renewal"  → 0.30
+        Pick top 2 → return L4, L5
+
+Result: Answers BOTH login AND invoice questions
+        ✅ Covers both branches of the query
+
+LLM calls during retrieval: 3 (1 at root + 2 at branch level)
+Leaves retrieved: 4
+```
+
+**`child_branch_factor=3` (Exhaustive — all paths)**
+
+```
+Step 1: ROOT has 3 children → follow ALL 3
+        → B1, B2, B3
+
+Step 2: Each branch → pick top 3 leaves (= all leaves)
+        → L1-L9 (all 9 leaves)
+
+Result: Maximum recall, but retrieves everything
+        ⚠️ Approaches Summary Index behavior (reads all docs)
+
+LLM calls during retrieval: 4 (1 + 3)
+Leaves retrieved: 9
+```
+
+**Summary: `child_branch_factor` Trade-offs**
+
+```
+child_branch_factor    Recall    Speed    LLM Calls    Best For
+───────────────────    ──────    ─────    ─────────    ────────────────────
+       1               Low       Fast     Fewest       Focused single-topic
+                                                       queries
+       2               Medium    Medium   Moderate     Multi-topic queries
+                                                       (recommended default)
+       N (= all)       High      Slow     Most         When you can't afford
+                                                       to miss anything
+```
 
 **Code:**
+
 ```python
 from llama_index.core import TreeIndex
 
@@ -764,6 +1058,7 @@ response = query_engine.query("Explain force and electromagnetic induction")
 - Browsing is important
 
 **Real-World Use Cases:**
+
 ```
 ✓ Technical manuals and documentation
   Query: "Explain section 4.2 of the compliance policy"
@@ -784,11 +1079,12 @@ response = query_engine.query("Explain force and electromagnetic induction")
   Query: "What is Newton's Second Law?"
   Structure: Textbook → Chapters → Sections → Paragraphs
   Traverses: Root → Physics → Mechanics → Newton's Laws
-
-Scale: 1000+ documents with natural hierarchy
 ```
 
+**Scale:** 1000+ documents with natural hierarchy
+
 **Parameters:**
+
 ```python
 TreeIndex.from_documents(
     docs,
