@@ -660,7 +660,7 @@ for node in vector_nodes + keyword_nodes:
 
 # Documents found by BOTH methods are likely most relevant!
 
-print("\nHybrid Retrieval Results (Combined):")
+print("\nHybrid Retrieval Results (Combined-naive):")
 for i, node in enumerate(hybrid_nodes[:3], 1):
     print(f"\n{i}. {node.metadata.get('ticket_id', 'Unknown')}")
     if hasattr(node, 'score') and node.score:
