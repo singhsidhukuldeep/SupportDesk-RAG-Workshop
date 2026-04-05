@@ -20,6 +20,8 @@ This comprehensive workshop teaches you to build a production-ready Retrieval-Au
 
 ### 1. Install Python 3.12 (one-time)
 
+> 💡 **Alternatively**, you can use [`uv`](https://docs.astral.sh/uv/) to skip the manual Python install — it downloads the correct version automatically. See [Step 3, Option A](#option-a-using-uv-auto-downloads-python-312) for setup details.
+
 > ⚠️ **Python 3.13 and 3.14 are not supported** — `chromadb` depends on Pydantic V1 internals that were removed in Python 3.13+.
 
 **Windows (PowerShell with winget):**
@@ -63,11 +65,41 @@ python3.12 --version
 ### 2. Clone or open this repo
 ```bash
 # If you already have the repo, skip this step
-git clone <your-repo-url>
+git clone https://github.com/singhsidhukuldeep/SupportDesk-RAG-Workshop.git
 cd SupportDesk-RAG-Workshop
 ```
 
 ### 3. Create a virtual environment (recommended)
+
+#### Option A: Using `uv` (auto-downloads Python 3.12)
+
+[`uv`](https://docs.astral.sh/uv/) can fetch the correct Python version automatically — no need to install Python 3.12 yourself (skip Step 1).
+
+Install `uv` if you don't have it:
+```bash
+# macOS/Linux
+curl -LsSf https://astral.sh/uv/install.sh | sh
+
+# Windows (PowerShell)
+powershell -ExecutionPolicy ByPass -c "irm https://astral.sh/uv/install.ps1 | iex"
+```
+
+Create the virtual environment:
+```bash
+uv venv --python 3.12 .venv
+```
+
+#### Option B: Using `conda` (auto-downloads Python 3.12)
+
+If you have [Miniconda](https://docs.conda.io/en/latest/miniconda.html) or Anaconda installed — no need to install Python 3.12 yourself (skip Step 1).
+
+```bash
+conda create -n supportdesk-rag python=3.12 -y
+```
+
+#### Option C: Using `venv` (manual)
+
+Requires Python 3.12 to be installed first (Step 1).
 
 **Windows (PowerShell):**
 ```powershell
@@ -80,6 +112,8 @@ python3.12 -m venv .venv
 ```
 
 ### 4. Activate the virtual environment
+
+**If you used `uv` or `venv` (Options A/C):**
 
 **Windows (PowerShell):**
 ```powershell
@@ -96,7 +130,19 @@ Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass; .\.venv\Scripts\Acti
 source .venv/bin/activate
 ```
 
+**If you used `conda` (Option B):**
+```bash
+conda activate supportdesk-rag
+```
+
 ### 5. Install dependencies
+
+**If you used `uv` (Option A):**
+```bash
+uv pip install -r requirements.txt
+```
+
+**If you used `conda` or `venv` (Options B/C):**
 ```bash
 python -m pip install --upgrade pip
 pip install -r requirements.txt
