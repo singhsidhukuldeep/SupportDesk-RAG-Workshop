@@ -74,6 +74,9 @@ for query in queries:
     response = query_engine.query(query)
     print(f"\nQuery: '{query}'")
     print(f"Answer: {str(response)[:150]}...")
+    for i, node in enumerate(response.source_nodes[:2], 1):
+        print(f"  Source {i}: [{node.metadata.get('ticket_id', '?')}] {node.text[:50]}...")
+
 
 
 # ============================================================================
@@ -89,13 +92,19 @@ query = "authentication login problem"
 engine_3 = vector_index.as_query_engine(similarity_top_k=3)
 response_3 = engine_3.query(query)
 print(f"\nWith similarity_top_k=3:")
+print(f"  Answer: {str(response_3)[:150]}...")
 print(f"  Sources: {len(response_3.source_nodes)} documents used")
+for i, node in enumerate(response_3.source_nodes[:2], 1):
+    print(f"    Source {i}: [{node.metadata.get('ticket_id', '?')}] {node.text[:50]}...")
 
 # top_k = 5 (changed)
 engine_5 = vector_index.as_query_engine(similarity_top_k=5)
 response_5 = engine_5.query(query)
 print(f"\nWith similarity_top_k=5:")
+print(f"  Answer: {str(response_5)[:150]}...")
 print(f"  Sources: {len(response_5.source_nodes)} documents used")
+for i, node in enumerate(response_5.source_nodes[:2], 1):
+    print(f"    Source {i}: [{node.metadata.get('ticket_id', '?')}] {node.text[:80]}...")
 
 
 # ============================================================================
@@ -179,7 +188,7 @@ def query_with_branch_info(tree_index, query, branch_factor):
     
     tree_engine = tree_index.as_query_engine(
         child_branch_factor=branch_factor,
-        verbose=True
+        verbose=False
     )
     
     start = time.time()
@@ -223,6 +232,9 @@ print(f"branch_factor=2: {len(response_2.source_nodes)} source nodes retrieved")
 print(f"branch_factor=3: {len(response_3.source_nodes)} source nodes retrieved")
 
 
+# Disable verbose logging for remaining exercises
+logging.basicConfig(level=logging.WARNING, force=True)
+
 # ============================================================================
 # Exercise 4: Test a Keyword-Specific Query (Easy)
 # ============================================================================
@@ -235,12 +247,18 @@ keyword_index = KeywordTableIndex.from_documents(documents)
 keyword_engine = keyword_index.as_query_engine()
 print("✓ Keyword Index built")
 
+# Enable keyword retriever logging to see which keywords are matched
+logging.getLogger("llama_index.core.indices.keyword_table.retrievers").setLevel(logging.INFO)
+
 keyword_queries = ["TICK-001", "authentication", "database timeout"]
 
 for query in keyword_queries:
     response = keyword_engine.query(query)
     print(f"\nKeyword query: '{query}'")
     print(f"  Answer: {str(response)[:150]}...")
+
+# Disable keyword retriever logging
+logging.getLogger("llama_index.core.indices.keyword_table.retrievers").setLevel(logging.WARNING)
 
 
 # ============================================================================

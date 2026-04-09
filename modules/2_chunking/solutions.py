@@ -97,6 +97,7 @@ for query in queries:
         print(f"\nQuery: '{query}'")
         print(f"  Best match: {results[0].metadata['ticket_id']}")
         print(f"  Category: {results[0].metadata['category']}")
+        print(f"  Content: {results[0].page_content[:45]}...")
 
 
 # ============================================================================
@@ -112,13 +113,13 @@ query = "Authentication problems"
 results_3 = store.similarity_search(query, k=3)
 print("\nTop 3 results:")
 for i, doc in enumerate(results_3, 1):
-    print(f"  {i}. {doc.metadata['ticket_id']}")
+    print(f"  {i}. {doc.metadata['ticket_id']} [{doc.metadata['category']}] {doc.page_content[:45]}...")
 
 # k=5 (changed)
 results_5 = store.similarity_search(query, k=5)
 print("\nTop 5 results:")
 for i, doc in enumerate(results_5, 1):
-    print(f"  {i}. {doc.metadata['ticket_id']}")
+    print(f"  {i}. {doc.metadata['ticket_id']} [{doc.metadata['category']}] {doc.page_content[:45]}...")
 
 
 # ============================================================================
@@ -161,6 +162,8 @@ chunk_sizes = [100, 200, 300, 500, 1000]
 
 print(f"\nTotal documents: {len(documents)}")
 print(f"Avg document length: {sum(len(d.page_content) for d in documents) // len(documents)} chars")
+print(f"Min document length: {min(len(d.page_content) for d in documents)} chars")
+print(f"Max document length: {max(len(d.page_content) for d in documents)} chars")
 print()
 print("Chunk Size | # Chunks | Avg Chunk Length")
 print("-" * 45)
@@ -194,6 +197,26 @@ for i, (doc, score) in enumerate(results_with_scores, 1):
     print(f"   Category: {doc.metadata['category']}")
 
 print("\n→ Lower score = more similar (Chroma uses L2 distance)")
+
+print("-" * 50,'\n', "-" * 50)
+
+# Now with cosine similarity
+print("\nSame query with cosine similarity:")
+cosine_store = Chroma.from_documents(
+    documents, embeddings, collection_name="exercise6_cosine",
+    collection_metadata={"hnsw:space": "cosine"}
+)
+cosine_results = cosine_store.similarity_search_with_score(query, k=5)
+print(f"\nQuery: '{query}'")
+print("\nResults with cosine similarity scores:")
+print("-" * 50)
+for i, (doc, score) in enumerate(cosine_results, 1):
+    cosine_similarity = 1 - score  # Chroma returns cosine distance, similarity = 1 - distance
+    print(f"#{i} - Cosine Similarity: {cosine_similarity:.4f}")
+    print(f"   Ticket: {doc.metadata['ticket_id']}")
+    print(f"   Category: {doc.metadata['category']}")
+
+print("\n→ Cosine similarity: closer to 1 = more similar, 0 = unrelated")
 
 
 # ============================================================================
@@ -300,6 +323,69 @@ if os.path.exists("./solution_chroma_db"):
 
 
 # ============================================================================
+# Bonus: Semantic vs Fixed Chunking (Challenge)
+# ============================================================================
+print("\n" + "=" * 80)
+print("BONUS: Semantic vs Fixed Chunking")
+print("=" * 80)
+
+from langchain_experimental.text_splitter import SemanticChunker
+
+# Load a longer document for better comparison
+long_text = """
+User Authentication System Overview
+
+The authentication system handles user login and session management. Users can
+authenticate using username/password or single sign-on (SSO). The system supports
+OAuth 2.0 and SAML protocols for enterprise integration.
+
+Password Security
+
+All passwords are hashed using bcrypt with a cost factor of 12. Password policies
+require a minimum of 8 characters with at least one uppercase, lowercase, number,
+and special character. Passwords expire after 90 days for compliance.
+
+Session Management
+
+User sessions are stored in Redis with a 24-hour expiration. Each session includes
+the user ID, roles, and creation timestamp. Sessions can be invalidated through
+the admin panel or via API.
+
+Two-Factor Authentication
+
+Users can enable 2FA using TOTP (Google Authenticator) or SMS verification.
+Backup codes are generated for account recovery. Enterprise accounts require
+2FA for all users.
+"""
+
+doc = Document(page_content=long_text.strip())
+
+# Fixed chunking
+fixed_splitter = RecursiveCharacterTextSplitter(chunk_size=300, chunk_overlap=30)
+fixed_chunks_bonus = fixed_splitter.split_documents([doc])
+
+# Semantic chunking
+semantic_splitter = SemanticChunker(embeddings, breakpoint_threshold_type="percentile")
+semantic_chunks_bonus = semantic_splitter.split_documents([doc])
+
+print("\nFixed Chunking Results:")
+print(f"Number of chunks: {len(fixed_chunks_bonus)}")
+for i, chunk in enumerate(fixed_chunks_bonus, 1):
+    print(f"\nChunk {i} ({len(chunk.page_content)} chars):")
+    print(f"  {chunk.page_content[:80]}...")
+
+print("\n" + "=" * 60)
+print("\nSemantic Chunking Results:")
+print(f"Number of chunks: {len(semantic_chunks_bonus)}")
+for i, chunk in enumerate(semantic_chunks_bonus, 1):
+    print(f"\nChunk {i} ({len(chunk.page_content)} chars):")
+    print(f"  {chunk.page_content[:80]}...")
+
+print("\n→ Notice: Semantic chunking splits by topic (auth, passwords, sessions, 2FA)")
+print("→ Fixed chunking splits by character count (may break mid-topic)")
+
+
+# ============================================================================
 # Summary
 # ============================================================================
 print("\n" + "=" * 80)
@@ -313,6 +399,7 @@ Key Takeaways:
 3. Metadata filtering narrows search to specific categories/priorities
 4. Chroma returns distance scores (lower = more similar)
 5. Persisting vector stores saves embedding computation time
+6. Semantic chunking respects topic boundaries, fixed chunking does not
 
 Next: Move on to Module 3 - Indexing Strategies!
 """)

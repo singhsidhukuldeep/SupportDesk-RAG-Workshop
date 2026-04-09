@@ -128,6 +128,9 @@ def search_with_threshold(query_text, threshold=0.5):
         print(f"\n→ {count} tickets above threshold")
 
 # Test with relevant query
+search_with_threshold("Users can't login after changing password")
+
+# Test with relevant query
 search_with_threshold("login authentication problem")
 
 # Test with irrelevant query
@@ -187,7 +190,7 @@ for i, text1 in enumerate(test_texts):
         if i < j:  # Only print upper triangle
             sim = similarity_matrix[i][j]
             relation = "SIMILAR" if sim > 0.7 else "DIFFERENT"
-            print(f"{sim:.3f} [{relation}] '{text1[:25]}...' vs '{text2[:25]}...'")
+            print(f"\n'{text1}' vs '{text2}'\n{sim:.3f} [{relation}]\n")
 
 print("\n→ Notice: Auth/Login texts have HIGH similarity despite different words")
 print("→ Notice: Database text has LOW similarity - different topic entirely")
@@ -258,6 +261,12 @@ time_slow = time.time() - start
 print(f"  Time: {time_slow:.2f} seconds")
 
 # Method 2: FAST - One API call for all texts
+# The maximum batch size for the OpenAI Embeddings API has two limits:
+
+# Max 2,048 inputs per request — 
+# the input array can contain at most 2,048 text strings
+# Max 300,000 tokens per request — 
+# total tokens across all inputs combined cannot exceed 300K
 print("\nMethod 2: Batch API call...")
 start = time.time()
 response = client.embeddings.create(input=batch_texts, model=model)
@@ -309,7 +318,7 @@ plt.title('Ticket Similarity Matrix\n(First 10 Tickets)')
 plt.tight_layout()
 plt.savefig('solution_similarity_heatmap.png', dpi=150, bbox_inches='tight')
 print("✓ Saved as solution_similarity_heatmap.png")
-plt.show()
+# plt.show() # Uncomment to display the heatmap in an interactive environment
 
 
 # ============================================================================
