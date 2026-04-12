@@ -75,6 +75,17 @@ for tool in tools:
 # Bind tools to LLM
 llm_with_tools = llm.bind(tools=tool_definitions)
 
+# NOTE: LangChain also provides `bind_tools()` which does the same thing without
+# needing the manual tool_definitions conversion above:
+#
+#   llm_with_tools = llm.bind_tools(tools)
+#
+# `bind_tools()` auto-converts LangChain Tool objects to the OpenAI function schema
+# using the tool's name, description, and function signature. We use the manual
+# approach here so you can see exactly what the OpenAI format looks like.
+# If you switch to bind_tools(), also update line ~129: tool_call["args"] will use
+# the actual function parameter names (e.g. "query") instead of the hardcoded "input".
+
 print(f"✓ Created {len(tools)} tools:")
 for tool in tools:
     print(f"  • {tool.name}: {tool.description.split('.')[0]}")
