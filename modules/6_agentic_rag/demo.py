@@ -383,5 +383,5 @@ print("""
 """)
 
 print("\n" + "="*80)
-print("Demo completed! Check exercises.md for hands-on practice.")
+print("Demo completed!")
 print("="*80)
