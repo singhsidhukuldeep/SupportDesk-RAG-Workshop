@@ -150,10 +150,26 @@ print("="*80)
 retriever = vector_store.as_retriever(
     search_type="similarity",  # Use cosine similarity for ranking
     search_kwargs={"k": 3}  # Retrieve top-3 most similar documents
+    )
     # Other options:
     # - "mmr" (Maximal Marginal Relevance): Balances relevance with diversity
+        # retriever = vector_store.as_retriever(
+        # search_type="mmr",
+        # search_kwargs={
+        #     "k": 3,                # final number of docs returned
+        #     "fetch_k": 10,         # candidates fetched before MMR re-ranks
+        #     "lambda_mult": 0.5     # 0 = max diversity, 1 = max relevance
+        # }
+        # )
     # - "similarity_score_threshold": Only return docs above a score threshold
-)
+        # retriever = vector_store.as_retriever(
+        # search_type="similarity_score_threshold",
+        # search_kwargs={
+        #     "score_threshold": 0.7,  # minimum similarity score (0-1)
+        #     "k": 3                   # max docs to return
+        # }
+        # )
+
 
 print("✓ Retriever configured:")
 print(f"  - Search type: similarity")
@@ -434,7 +450,9 @@ if llm:
          "Given the chat history and a follow-up question, rephrase the "
          "follow-up as a standalone question that includes all necessary "
          "context from the history. If the question is already standalone, "
-         "return it unchanged."),
+         "return it unchanged.\n\n"
+         "IMPORTANT: Output ONLY the rephrased question. Do NOT answer it. "
+         "Do NOT include any explanation or additional text."),
         MessagesPlaceholder(variable_name="chat_history"),
         ("human", "{question}"),
     ])
@@ -475,6 +493,10 @@ Context:
             standalone = condense_chain.invoke({
                 "question": question, "chat_history": history
             })
+
+        # Show what the retriever actually sees (useful for debugging)
+        if standalone != question:
+            print(f"         [Rewritten query → {standalone}]")
 
         # Retrieve docs using the standalone query and generate the answer
         context = format_docs(retriever.invoke(standalone))
@@ -552,7 +574,7 @@ if qa_chain:
     while True:
         user_query = input("You: ").strip()
         
-        if user_query.lower() in ['quit', 'exit', 'q']:
+        if user_query.lower().strip() in ['quit', 'exit', 'q', '']:
             print("Goodbye!")
             break
         
