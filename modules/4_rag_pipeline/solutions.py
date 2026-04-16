@@ -399,7 +399,7 @@ from langchain_core.output_parsers import StrOutputParser
 # Compare different retrieval strategies using LCEL
 strategies = {
     "stuff": "Concatenate all documents into context (fast, simple)",
-    "map_reduce": "Process each doc separately, then combine (parallel)",
+    "map_reduce": "Process/summarise each doc separately, then combine (parallel)",
     "refine": "Iteratively refine answer with each doc (highest quality)"
 }
 
@@ -547,8 +547,8 @@ from langchain_core.callbacks import StreamingStdOutCallbackHandler
 streaming_llm = ChatOpenAI(
     model="gpt-4o-mini",
     temperature=0,
-    streaming=True,
-    callbacks=[StreamingStdOutCallbackHandler()],
+    streaming=True,                              # ← key flag: enable token streaming
+    callbacks=[StreamingStdOutCallbackHandler()],# ← print each token as it arrives
     timeout=120,
     max_retries=3
 )
@@ -567,7 +567,7 @@ Detailed Answer:""")
 streaming_chain = (
     {"context": retriever | format_docs, "question": RunnablePassthrough()}
     | prompt
-    | streaming_llm
+    | streaming_llm # ← only difference: streaming_llm instead of llm
     | StrOutputParser()
 )
 
@@ -640,19 +640,31 @@ Context:
 #     │
 #     ▼
 #   LLM → StrOutputParser → answer (str)
+# conv_chain = (
+#     # First, rewrite the question into a standalone form
+#     RunnablePassthrough.assign(
+#         standalone=condense_chain
+#     )
+#     # Then, use the standalone question to retrieve relevant docs
+#     | RunnablePassthrough.assign(
+#         context=itemgetter("standalone") | retriever | format_docs
+#     )
+#     | conv_prompt
+#     | llm
+#     | StrOutputParser()
+# )
+
 conv_chain = (
-    # First, rewrite the question into a standalone form
-    RunnablePassthrough.assign(
-        standalone=condense_chain
-    )
-    # Then, use the standalone question to retrieve relevant docs
-    | RunnablePassthrough.assign(
-        context=itemgetter("standalone") | retriever | format_docs
-    )
+    {
+        "context": condense_chain | retriever | format_docs,
+        "chat_history": itemgetter("chat_history"),
+        "question": itemgetter("question"),
+    }
     | conv_prompt
     | llm
     | StrOutputParser()
 )
+
 
 def ask_with_history(question, history):
     """
@@ -692,6 +704,8 @@ conversation = [
 ]
 
 print("\nSimulated conversation:")
+# Start empty chat history
+chat_history = []
 for user_msg in conversation:
     print(f"\nUser: {user_msg}")
     result = ask_with_history(user_msg, chat_history)
