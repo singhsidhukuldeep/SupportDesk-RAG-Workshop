@@ -174,10 +174,42 @@ for k in [1, 3, 5, 10]:
         retrieved = [doc.metadata['ticket_id'] for doc in docs]
         m = calculate_metrics(retrieved, query['relevant_ticket_ids'], k=k)
         metrics.append(m)
-    
+
     print(f"\nk={k}:")
     print(f"  Precision@{k}: {np.mean([m['precision'] for m in metrics]):.4f}")
     print(f"  Recall@{k}:    {np.mean([m['recall'] for m in metrics]):.4f}")
+
+
+# ── Bonus: Average Precision (rank-aware) ────────────────────────────
+# Precision@k treats positions 1..k as equal. Average Precision (AP) rewards
+# placing relevant docs EARLIER in the ranking — the same hit set scores
+# higher when relevant items appear near the top.
+#
+# AP = mean of precision@k at every rank where a relevant doc is found.
+def average_precision(retrieved_ids, relevant_ids):
+    """Ranking-aware precision: higher when relevant docs appear earlier."""
+    precisions = []
+    relevant_count = 0
+    for k, doc_id in enumerate(retrieved_ids, 1):
+        if doc_id in relevant_ids:
+            relevant_count += 1
+            precisions.append(relevant_count / k)
+    return float(np.mean(precisions)) if precisions else 0.0
+
+# Sanity check — same hits, different ordering → different AP
+print(f"\nAverage Precision sanity checks:")
+print(f"  ['A','B','C'] vs ['A','C']: AP={average_precision(['A','B','C'], ['A','C']):.2f}  (expected ~0.83)")
+print(f"  ['B','A','C'] vs ['A','C']: AP={average_precision(['B','A','C'], ['A','C']):.2f}  (expected ~0.58)")
+
+# Mean Average Precision (MAP) across all eval queries
+aps = [
+    average_precision(
+        [d.metadata['ticket_id'] for d in vector_store.similarity_search(q['question'], k=10)],
+        q['relevant_ticket_ids']
+    )
+    for q in eval_queries
+]
+print(f"\nMAP@10 over {len(eval_queries)} queries: {np.mean(aps):.4f}")
 
 
 # ============================================================================
