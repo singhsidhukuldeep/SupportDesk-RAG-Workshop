@@ -279,7 +279,7 @@ def smart_rag(query, vector_store, llm, min_score_threshold=0.7):
     
     print(f"  Best match distance: {best_distance:.4f}")
     
-    if best_distance < 0.5:  # Very relevant
+    if best_distance < 0.5:  # Very relevant: can be `min_score_threshold`
         # High-confidence path: construct full grounded prompt and answer directly.
         docs = [doc for doc, score in docs_with_scores]
         context = format_docs(docs)
@@ -300,7 +300,8 @@ Answer:"""
         ticket_id = docs_with_scores[0][0].metadata['ticket_id']
         return f"Found possibly relevant ticket ({ticket_id}), but confidence is moderate. Would you like me to show details?", "medium_confidence"
     
-    else:  # Not relevant
+    else:  # Not relevant: Distance has a general range of 0.4 to 0.9, so there is almost no possibility that we will reach here. 
+        # But theoretically Cosine distance range: [0, 2] (0 = identical, 1 = orthogonal, 2 = opposite)
         # Low-confidence path: safe refusal to avoid unsupported generation.
         return "I don't have relevant ticket history for this question.", "low_confidence"
 
