@@ -74,7 +74,7 @@ for query in queries:
     response = query_engine.query(query)
     print(f"\nQuery: '{query}'")
     print(f"Answer: {str(response)[:150]}...")
-    for i, node in enumerate(response.source_nodes[:2], 1):
+    for i, node in enumerate(response.source_nodes[:3], 1):
         print(f"  Source {i}: [{node.metadata.get('ticket_id', '?')}] {node.text[:50]}...")
 
 
