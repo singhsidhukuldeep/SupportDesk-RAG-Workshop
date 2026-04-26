@@ -207,7 +207,7 @@ Use this when the user mentions a specific ticket number."""
                 name="SearchByCategory",
                 func=self.search_by_category,
                 description="""Use this tool to find all tickets in a specific category.
-Input should be a category name like 'Authentication', 'Database', 'Payment', etc.
+Input should be a category name like 'Authentication', 'Database', 'Payment', 'Mobile', etc.
 Use this when the user wants to see all issues of a certain type."""
             ),
             Tool(
