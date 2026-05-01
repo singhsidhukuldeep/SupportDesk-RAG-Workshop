@@ -256,7 +256,7 @@ print("\n" + "=" * 80)
 print("EXERCISE 4: Build a Fallback System")
 print("=" * 80)
 
-def smart_rag(query, vector_store, llm, min_score_threshold=0.7):
+def smart_rag(query, vector_store, llm, min_score_threshold=0.6):
     """
     RAG with confidence-based fallbacks.
 
@@ -279,7 +279,7 @@ def smart_rag(query, vector_store, llm, min_score_threshold=0.7):
     
     print(f"  Best match distance: {best_distance:.4f}")
     
-    if best_distance < 0.5:  # Very relevant: can be `min_score_threshold`
+    if best_distance < min_score_threshold:  
         # High-confidence path: construct full grounded prompt and answer directly.
         docs = [doc for doc, score in docs_with_scores]
         context = format_docs(docs)
