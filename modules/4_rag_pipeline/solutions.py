@@ -682,6 +682,7 @@ def ask_with_history(question, history):
         # Follow-up turn: rewrite the question using history context
         # e.g. "How do I fix it?" → "How do I fix authentication failures?"
         standalone = condense_chain.invoke({"question": question, "chat_history": history})
+        print()(f"Rewritten question for retrieval: '{standalone}'")
 
     # Retrieve docs using the standalone query and generate the answer
     context = format_docs(retriever.invoke(standalone))
