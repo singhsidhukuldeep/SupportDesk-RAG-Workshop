@@ -295,7 +295,7 @@ Answer:"""
         response = llm.invoke(prompt)
         return response.content, "high_confidence"
     
-    elif best_distance < 1.0:  # Somewhat relevant
+    elif best_distance < 0.9:  # Somewhat relevant
         # Medium-confidence path: avoid overclaiming, ask for confirmation/context.
         ticket_id = docs_with_scores[0][0].metadata['ticket_id']
         return f"Found possibly relevant ticket ({ticket_id}), but confidence is moderate. Would you like me to show details?", "medium_confidence"
@@ -682,7 +682,7 @@ def ask_with_history(question, history):
         # Follow-up turn: rewrite the question using history context
         # e.g. "How do I fix it?" → "How do I fix authentication failures?"
         standalone = condense_chain.invoke({"question": question, "chat_history": history})
-        print()(f"Rewritten question for retrieval: '{standalone}'")
+        print(f"Rewritten question for retrieval: '{standalone}'")
 
     # Retrieve docs using the standalone query and generate the answer
     context = format_docs(retriever.invoke(standalone))
