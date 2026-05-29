@@ -88,6 +88,8 @@ print("=" * 80)
 
 query = "authentication login problem"
 
+print(f"\n>> Query: '{query}'")
+
 # top_k = 3 (original)
 engine_3 = vector_index.as_query_engine(similarity_top_k=3)
 response_3 = engine_3.query(query)
