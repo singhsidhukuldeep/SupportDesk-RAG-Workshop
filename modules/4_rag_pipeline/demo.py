@@ -511,6 +511,7 @@ Context:
         return answer
 
     # ── Demonstrate a 3-turn conversation ──────────────────────────────────
+    print("-"*80)
     print("Multi-turn conversation demo:\n")
     history = []
 
