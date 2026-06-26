@@ -510,6 +510,8 @@ print("=" * 80)
 
 query = "system problem"
 
+print(f"\nQuery: {query}")
+
 # Without filter
 print("\nWithout filter:")
 docs = vector_store.similarity_search(query, k=3)
@@ -684,7 +686,7 @@ def ask_with_history(question, history):
         # Follow-up turn: rewrite the question using history context
         # e.g. "How do I fix it?" → "How do I fix authentication failures?"
         standalone = condense_chain.invoke({"question": question, "chat_history": history})
-        print(f"Rewritten question for retrieval: '{standalone}'")
+        print(f">> Rewritten question for retrieval: '{standalone}'")
 
     # Retrieve docs using the standalone query and generate the answer
     context = format_docs(retriever.invoke(standalone))
@@ -710,9 +712,9 @@ print("\nSimulated conversation:")
 # Start empty chat history
 chat_history = []
 for user_msg in conversation:
-    print(f"\nUser: {user_msg}")
+    print(f"\n>> User: {user_msg}")
     result = ask_with_history(user_msg, chat_history)
-    print(f"Assistant: {result[:200]}...")
+    print(f">> Assistant: {result[:200]}...")
 
 
 # ============================================================================
