@@ -515,6 +515,7 @@ print("="*80)
 # We want to search ONLY authentication-related tickets
 # -----------------------------------------------------------------------------
 print("\nSearching only in 'Authentication' category:")
+print(f"Query: '{query}'")
 filtered_results = chroma_store.similarity_search(
     query,
     k=3,
@@ -535,8 +536,10 @@ for i, doc in enumerate(filtered_results, 1):
 # Combine semantic search with priority filter
 # -----------------------------------------------------------------------------
 print("\n\nSearching only 'High' priority tickets:")
+query = "Database performance issues"
+print(f"Query: '{query}'")
 high_priority_results = chroma_store.similarity_search(
-    "Database performance issues",
+    query,
     k=3,
     filter={"priority": "High"}  # Only high priority
 )
