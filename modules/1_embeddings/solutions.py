@@ -206,6 +206,9 @@ print("=" * 80)
 def search_with_category(query, category_filter=None, top_k=5):
     """Search tickets, optionally filtering by category"""
     # Get query embedding
+
+    print(f"\nQuery: '{query}' (category filter: {category_filter})")
+
     response = client.embeddings.create(input=[query], model=model)
     query_emb = np.array([response.data[0].embedding])
     
