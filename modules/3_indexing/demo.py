@@ -436,7 +436,7 @@ print(f"Building Tree Index with {len(tree_documents)} documents...")
 #   Documents loaded in order preserve locality of topic.
 #   The LLM summary layer compensates for any mixed groups.
 # -----------------------------------------------------------------------------
-tree_index = TreeIndex.from_documents(tree_documents)
+tree_index = TreeIndex.from_documents(tree_documents, num_children=10)
 
 # -----------------------------------------------------------------------------
 # Create Query Engine
