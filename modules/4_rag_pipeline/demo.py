@@ -30,7 +30,7 @@ from langchain_core.documents import Document  # Document abstraction
 from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder  # Prompt templates
 from langchain_core.messages import HumanMessage, AIMessage  # Chat history message types
 from langchain_core.output_parsers import StrOutputParser  # Parse LLM output
-from langchain_core.runnables import RunnablePassthrough  # Pass data through pipeline
+from langchain_core.runnables import RunnablePassthrough  # Pass data through pipeline> lambda x:x
 
 # Load environment variables (API keys, model names)
 from dotenv import load_dotenv
