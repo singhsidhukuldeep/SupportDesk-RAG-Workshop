@@ -131,7 +131,7 @@ for name, template in templates:
         | StrOutputParser()
     )
     
-    print(f"\n{name} template:")
+    print(f"\n\n >>{name} template:")
     response = chain.invoke(test_query)
     print(f"  {response[:200]}...")
 
