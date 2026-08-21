@@ -513,13 +513,14 @@ evaluation_cases = [
 correct = 0
 total = len(evaluation_cases)
 
-print("\nRunning evaluation...")
+print("\nRunning evaluation...\n")
 for test in evaluation_cases:
     result = run_agent(test['query'])
     passed = test['expected_tool'] in result['tools_used']
     if passed:
         correct += 1
     print(f"  {'✓' if passed else '✗'} '{test['query'][:30]}...' → {result['tools_used']}")
+    print("-" * 70)
 
 accuracy = correct / total * 100
 print(f"\nTool Selection Accuracy: {correct}/{total} ({accuracy:.0f}%)")
