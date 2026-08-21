@@ -122,6 +122,8 @@ Answer (bullet points with sources):"""
 templates = [("Concise", template_a), ("Step-by-step", template_b), ("Bullet points", template_c)]
 test_query = "How do I fix authentication issues?"
 
+print(f"\nQuery: {test_query}")
+
 for name, template in templates:
     prompt = ChatPromptTemplate.from_template(template)
     chain = (
