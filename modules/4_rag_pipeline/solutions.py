@@ -671,6 +671,13 @@ conv_chain = (
     | StrOutputParser()
 )
 
+# Usage:
+#   chat_history = [
+#       HumanMessage(content="Why are users unable to log in after a password reset?"),
+#       AIMessage(content="Tickets TKT-101 and TKT-118 point to a stale session cache."),
+#   ]
+#   answer = conv_chain.invoke({"question": "How do I fix it?", "chat_history": chat_history})
+
 
 def ask_with_history(question, history):
     """
