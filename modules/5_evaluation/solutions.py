@@ -178,6 +178,7 @@ for k in [1, 3, 5, 10]:
     print(f"\nk={k}:")
     print(f"  Precision@{k}: {np.mean([m['precision'] for m in metrics]):.4f}")
     print(f"  Recall@{k}:    {np.mean([m['recall'] for m in metrics]):.4f}")
+    print(f"  F1@{k}:        {np.mean([m['f1'] for m in metrics]):.4f}")
 
 
 # ── Bonus: Average Precision (rank-aware) ────────────────────────────
