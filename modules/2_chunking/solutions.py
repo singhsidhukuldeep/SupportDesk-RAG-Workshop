@@ -23,9 +23,9 @@ load_dotenv()
 
 # Initialize embeddings
 embeddings = OpenAIEmbeddings(model='text-embedding-3-small')
-print("✓ Initialized embeddings model")
+print("✓ Initialized embeddings model \n")
 print(embeddings.embed_query("Warm up embeddings model")[:10], "...")  # Show first 10 values for brevity 
-print("✓ Checked embeddings model\n")
+print("\n✓ Checked embeddings model\n")
 
 # Load data
 print("Loading data...")
