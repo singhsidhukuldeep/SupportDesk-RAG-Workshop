@@ -47,11 +47,6 @@ documents = [
 ]
 print(f"✓ Loaded {len(documents)} documents\n")
 
-# Build vector index (fast - just embeddings, no LLM calls)
-print("Building Vector Index...")
-vector_index = VectorStoreIndex.from_documents(documents)
-print("✓ Vector Index built\n")
-
 
 # ============================================================================
 # Exercise 1: Change the Query (Easy)
@@ -61,7 +56,9 @@ print("EXERCISE 1: Change the Query")
 print("=" * 80)
 
 # Build a simple vector index for testing
+print("Building Vector Index...")
 vector_index = VectorStoreIndex.from_documents(documents)
+print("✓ Vector Index built\n")
 query_engine = vector_index.as_query_engine(similarity_top_k=3)
 
 queries = [
@@ -76,6 +73,7 @@ for query in queries:
     print(f"Answer: {str(response)[:150]}...")
     for i, node in enumerate(response.source_nodes[:3], 1):
         print(f"  Source {i}: [{node.metadata.get('ticket_id', '?')}] {node.text[:50]}...")
+    print("-" * 60)
 
 
 
