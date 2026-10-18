@@ -177,6 +177,7 @@ recursive_splitter = RecursiveCharacterTextSplitter(
 recursive_chunks = recursive_splitter.split_documents(documents)
 
 print(f"✓ Created {len(recursive_chunks)} chunks")
+print(f"  Chunk size: 300 chars, Overlap: 50 chars")
 print(f"  Tries to split on paragraph/sentence boundaries")
 print(f"  Sample chunk: {recursive_chunks[0].page_content[:100]}...")
 
