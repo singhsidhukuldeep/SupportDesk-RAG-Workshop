@@ -409,6 +409,8 @@ strategies = {
 
 test_query = "How do I fix database timeouts?"
 
+print(f"\nQuery: {test_query}")
+
 # ── STUFF strategy (default) ──────────────────────────────────────────
 # All retrieved docs are "stuffed" into a single {context} variable
 # and sent to the LLM in ONE call.
