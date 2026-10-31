@@ -224,7 +224,7 @@ Use this when the user asks for statistics, summaries, or overview of tickets.""
 # ──────────────────────────────────────────────────────────────────────
 # Example: Using the @tool decorator to create a tool from any function
 # ──────────────────────────────────────────────────────────────────────
-# from langchain_core.tools import tool
+# from langchain_core.tools import tool, Tool
 #
 # @tool
 # def add_two_numbers(a: int, b: int) -> int:
